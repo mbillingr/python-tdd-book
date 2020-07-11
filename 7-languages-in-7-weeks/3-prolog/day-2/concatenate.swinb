@@ -1,0 +1,40 @@
+<div class="notebook">
+
+<div class="nb-cell program" name="p1">
+
+</div>
+
+<div class="nb-cell query" name="q1">
+append([oil], [water], [oil, water]).
+</div>
+
+<div class="nb-cell query" name="q2">
+append([oil], [water], [oil, slick]).
+</div>
+
+<div class="nb-cell query" name="q3">
+append([tiny], [bubbles], What).
+</div>
+
+<div class="nb-cell query" name="q4">
+append([dessert_topping], Who, [dessert_topping, floor_wax]).
+</div>
+
+<div class="nb-cell query" name="q5">
+append(One, Two, [apples, oranges, bananas]).
+</div>
+
+<div class="nb-cell program" name="p2">
+concatenate([], X, X).
+concatenate([H|T1], X, [H|T2]) :- concatenate(T1, X, T2).
+</div>
+
+<div class="nb-cell query" name="q6">
+concatenate([a], [], What).
+</div>
+
+<div class="nb-cell query" name="q7">
+concatenate([a, b], [c, d], What).
+</div>
+
+</div>

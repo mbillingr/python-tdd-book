@@ -1,0 +1,25 @@
+<div class="notebook">
+
+<div class="nb-cell program" name="p1">
+count(0, []).
+count(Count, [_|Tail]) :- count(TailCount, Tail), Count is TailCount + 1.
+
+sum(0, []).
+sum(Total, [Head|Tail]) :- sum(Sum, Tail), Total is Head + Sum.
+
+average(Average, List) :- sum(Sum, List), count(Count, List), Average is Sum/Count.
+</div>
+
+<div class="nb-cell query" name="q1">
+count(What, [1]).
+</div>
+
+<div class="nb-cell query" name="q2">
+sum(What, [1, 2, 3]).
+</div>
+
+<div class="nb-cell query" name="q3">
+average(X, [1, 2, 3]).
+</div>
+
+</div>

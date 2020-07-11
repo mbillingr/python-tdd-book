@@ -1,0 +1,38 @@
+<div class="notebook">
+
+<div class="nb-cell program" name="p1">
+reverse([], []).
+reverse([H|T], Result) :- reverse(T, RT), append(RT, [H], Result).
+
+min(A, A, A).
+min(A, B, A) :- A &lt; B.
+min(A, B, B) :- B &lt; A.
+minimum([], inf).
+minimum([A|T], R) :- minimum(T, RT), min(A, RT, R).
+
+insert_sorted(A, [], [A]).
+insert_sorted(A, [A|T], [A, A|T]).
+insert_sorted(A, [H|T], [A|[H|T]]) :- A &lt; H.
+insert_sorted(A, [H|T], [H|X]) :- A &gt; H, insert_sorted(A, T, X).
+
+sorted([], []).
+sorted([H|T], R) :- sorted(T, S), insert_sorted(H, S, R).
+</div>
+
+<div class="nb-cell query" name="q1">
+reverse([1, 2, 3, 4], What).
+</div>
+
+<div class="nb-cell query" name="q2">
+minimum([2, 1, 3, 4], X).
+</div>
+
+<div class="nb-cell query" name="q4">
+insert_sorted(20, [10, 20, 30], What).
+</div>
+
+<div class="nb-cell query" name="q3">
+sorted([7, 5, 3, 1, 9, 0, 2, 4, 6, 8], What).
+</div>
+
+</div>
