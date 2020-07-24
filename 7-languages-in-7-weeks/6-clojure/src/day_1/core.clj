@@ -1,5 +1,7 @@
 (ns day-1.core)
 
+(println "DAY 1\n")
+
 (println "Exercise 1")
 
 (defn big [st n]  (> (count st) n))
