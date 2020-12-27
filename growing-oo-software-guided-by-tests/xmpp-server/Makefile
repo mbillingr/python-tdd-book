@@ -1,8 +1,15 @@
 
-run-server: prosody-0.11.7/prosody.cfg.lua.install prosody-0.11.7/prosody.cfg.lua
+run-server: prosody-0.11.7/accounts-created prosody-0.11.7/prosody.cfg.lua
 	echo "running server"
 	cd prosody-0.11.7; \
 	lua5.3 prosody
+
+prosody-0.11.7/accounts-created: prosody-0.11.7/prosody.cfg.lua.install prosody-0.11.7/prosody.cfg.lua
+	cd prosody-0.11.7; \
+	lua5.3 prosodyctl register sniper localhost sniper; \
+	lua5.3 prosodyctl register auction-item-54321 localhost auction; \
+	lua5.3 prosodyctl register auction-item-65432 localhost auction; \
+	touch accounts-created
 
 prosody-0.11.7.tar.gz:
 	echo "downloading..."
