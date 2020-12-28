@@ -2,9 +2,16 @@ fn main() {
     println!("Hello, world!");
 }
 
-pub fn sniper_main(_xmpp_hostname: &str, _sniper_id: &str, _sniper_password: &str, mut io: impl SniperIO) -> Result<(), ()> {
-    io.update("STATUS: joining");
-    Ok(())
+pub fn sniper_main(
+    _xmpp_hostname: &str,
+    _sniper_id: &str,
+    _sniper_password: &str,
+    mut io: impl SniperIO,
+) -> Result<(), ()> {
+    loop {
+        let _ = io.get_command();
+        io.update("STATUS: joining");
+    }
 }
 
 const STATUS_JOINING: &str = "joining";
@@ -15,19 +22,19 @@ pub trait SniperIO {
     fn update(&mut self, text: &str);
 }
 
-pub enum SniperCommand{
-    Update
+pub enum SniperCommand {
+    Update,
 }
 
 #[cfg(test)]
 mod auction_sniper_end_to_end_tests {
     use crate::*;
+    use std::cell::RefCell;
+    use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use std::thread::JoinHandle;
-    use std::cell::RefCell;
-    use std::sync::mpsc::{Sender, Receiver, TryRecvError};
     use std::time::Duration;
-    use std::sync::{Arc, Mutex};
 
     const XMPP_HOSTNAME: &str = "localhost";
 
@@ -65,8 +72,13 @@ mod auction_sniper_end_to_end_tests {
             let thread = thread::Builder::new()
                 .name("Test Application".to_string())
                 .spawn(|| {
-                    crate::sniper_main(XMPP_HOSTNAME, Self::sniper_id(), Self::sniper_password(), thread_driver)
-                        .unwrap()
+                    crate::sniper_main(
+                        XMPP_HOSTNAME,
+                        Self::sniper_id(),
+                        Self::sniper_password(),
+                        thread_driver,
+                    )
+                    .unwrap()
                 })
                 .unwrap();
 
@@ -81,31 +93,54 @@ mod auction_sniper_end_to_end_tests {
     }
 
     struct AuctionSniperDriver {
-        last_output: Mutex<String>,
+        command_tx: Mutex<Sender<SniperCommand>>,
+        command_rx: Mutex<Receiver<SniperCommand>>,
+        output_tx: Mutex<Sender<String>>,
+        output_rx: Mutex<Receiver<String>>,
     }
 
     impl AuctionSniperDriver {
         fn new() -> Self {
+            let (ctx, crx) = channel();
+            let (otx, orx) = channel();
             AuctionSniperDriver {
-                last_output: Mutex::new(String::new())
+                command_tx: Mutex::new(ctx),
+                command_rx: Mutex::new(crx),
+                output_tx: Mutex::new(otx),
+                output_rx: Mutex::new(orx),
             }
         }
 
         fn shows_sniper_status(&self, status_text: &str) {
-            thread::sleep(Duration::from_millis(10));
-            let output = self.last_output.lock().unwrap();
+            self.send_command(SniperCommand::Update);
+            let output = self.get_output();
             let idx = output.find("STATUS:").unwrap();
-            assert!(output[idx..].starts_with(&format!("STATUS: {}", status_text)));
+            assert!(
+                output[idx..].starts_with(&format!("STATUS: {}", status_text)),
+                format!("sniper does not show status {:?}", status_text)
+            );
+        }
+
+        fn send_command(&self, cmd: SniperCommand) {
+            self.command_tx.lock().unwrap().send(cmd).unwrap()
+        }
+
+        fn get_output(&self) -> String {
+            self.output_rx.lock().unwrap().recv().unwrap()
         }
     }
 
     impl SniperIO for Arc<AuctionSniperDriver> {
         fn get_command(&mut self) -> SniperCommand {
-            unimplemented!()
+            self.command_rx.lock().unwrap().recv().unwrap()
         }
 
         fn update(&mut self, text: &str) {
-            *self.last_output.lock().unwrap() = text.to_string();
+            self.output_tx
+                .lock()
+                .unwrap()
+                .send(text.to_string())
+                .unwrap()
         }
     }
 
@@ -130,47 +165,58 @@ mod auction_sniper_end_to_end_tests {
 
             let (out_tx, out_rx) = std::sync::mpsc::channel::<String>();
 
-            let message_handler = move |_ctx: &libstrophe::Context, conn: &mut libstrophe::Connection, stanza: &libstrophe::Stanza| {
-                let body = match stanza.get_child_by_name("body") {
-                    Some(body) => body,
-                    None => return true,
+            let message_handler =
+                move |_ctx: &libstrophe::Context,
+                      conn: &mut libstrophe::Connection,
+                      stanza: &libstrophe::Stanza| {
+                    let body = match stanza.get_child_by_name("body") {
+                        Some(body) => body,
+                        None => return true,
+                    };
+
+                    match stanza.stanza_type() {
+                        Some(typ) => {
+                            if typ == "error" {
+                                return true;
+                            }
+                        }
+                        None => return true,
+                    };
+
+                    let intext = body.text().expect("Cannot get body");
+
+                    tx.send(intext.clone()).unwrap();
+
+                    eprintln!(
+                        "Incoming message from {}: {}",
+                        stanza.from().expect("Cannot get from"),
+                        intext
+                    );
+
+                    let mut reply = stanza.reply();
+                    if reply.stanza_type().is_none() {
+                        reply.set_stanza_type("chat").expect("Cannot set type");
+                    }
+
+                    let (quit, replytext) = if intext == "quit" {
+                        (true, "bye!".to_owned())
+                    } else {
+                        (false, format!("{} to you too!", intext))
+                    };
+                    reply.set_body(replytext).expect("Cannot set body");
+
+                    conn.send(&reply);
+
+                    if quit {
+                        conn.disconnect();
+                    }
+
+                    true
                 };
 
-                match stanza.stanza_type() {
-                    Some(typ) => if typ == "error"{
-                        return true
-                    },
-                    None => return true,
-                };
-
-                let intext = body.text().expect("Cannot get body");
-
-                tx.send(intext.clone()).unwrap();
-
-                eprintln!("Incoming message from {}: {}", stanza.from().expect("Cannot get from"), intext);
-
-                let mut reply = stanza.reply();
-                if reply.stanza_type().is_none() {
-                    reply.set_stanza_type("chat").expect("Cannot set type");
-                }
-
-                let (quit, replytext) = if intext == "quit" {
-                    (true, "bye!".to_owned())
-                } else {
-                    (false, format!("{} to you too!", intext))
-                };
-                reply.set_body(replytext).expect("Cannot set body");
-
-                conn.send(&reply);
-
-                if quit {
-                    conn.disconnect();
-                }
-
-                true
-            };
-
-            let conn_handler = |ctx: &libstrophe::Context, conn: &mut libstrophe::Connection, evt: libstrophe::ConnectionEvent| {
+            let conn_handler = |ctx: &libstrophe::Context,
+                                conn: &mut libstrophe::Connection,
+                                evt: libstrophe::ConnectionEvent| {
                 match evt {
                     libstrophe::ConnectionEvent::Connect => {
                         eprintln!("Connected");
@@ -181,29 +227,39 @@ mod auction_sniper_end_to_end_tests {
                         eprintln!("Disconnected, Reason: {:?}", err);
                         ctx.stop();
                     }
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 }
             };
 
-            let mut conn = libstrophe::Connection::new(libstrophe::Context::new_with_default_logger());
+            let mut conn =
+                libstrophe::Connection::new(libstrophe::Context::new_with_default_logger());
             conn.set_jid(jid);
             conn.set_pass(pass);
-            conn.set_flags(libstrophe::ConnectionFlags::TRUST_TLS).unwrap();
-            conn.handler_add(message_handler, None, Some("message"), None).unwrap();
-            conn.timed_handler_add(move |ctx: &libstrophe::Context, conn: &mut Connection| {
-                match out_rx.try_recv() {
-                    Ok(msg) if msg == "/stop/" => ctx.stop(),
-                    Ok(msg) => {
-                        let mut stanza = Stanza::new_message(Some("chat"), None, Some("sniper@localhost"));
-                        stanza.set_body(&msg).unwrap();
-                        conn.send(&stanza)
-                    },
-                    Err(TryRecvError::Empty) => {},
-                    Err(TryRecvError::Disconnected) => return false,
-                }
-                true
-            }, Duration::from_millis(1)).unwrap();
-            let ctx = conn.connect_client(None, None, conn_handler).expect("Cannot connect to XMPP server");
+            conn.set_flags(libstrophe::ConnectionFlags::TRUST_TLS)
+                .unwrap();
+            conn.handler_add(message_handler, None, Some("message"), None)
+                .unwrap();
+            conn.timed_handler_add(
+                move |ctx: &libstrophe::Context, conn: &mut Connection| {
+                    match out_rx.try_recv() {
+                        Ok(msg) if msg == "/stop/" => ctx.stop(),
+                        Ok(msg) => {
+                            let mut stanza =
+                                Stanza::new_message(Some("chat"), None, Some("sniper@localhost"));
+                            stanza.set_body(&msg).unwrap();
+                            conn.send(&stanza)
+                        }
+                        Err(TryRecvError::Empty) => {}
+                        Err(TryRecvError::Disconnected) => return false,
+                    }
+                    true
+                },
+                Duration::from_millis(1),
+            )
+            .unwrap();
+            let ctx = conn
+                .connect_client(None, None, conn_handler)
+                .expect("Cannot connect to XMPP server");
 
             let thread = thread::Builder::new()
                 .name("Fake Auction Server".to_string())
@@ -258,14 +314,14 @@ mod auction_sniper_end_to_end_tests {
 
     struct SingleMessageListener {
         rx: Receiver<Message>,
-        message: RefCell<Option<Message>>
+        message: RefCell<Option<Message>>,
     }
 
     impl SingleMessageListener {
         pub fn new(rx: Receiver<Message>) -> Self {
             SingleMessageListener {
                 rx,
-                message: Default::default()
+                message: Default::default(),
             }
         }
 
