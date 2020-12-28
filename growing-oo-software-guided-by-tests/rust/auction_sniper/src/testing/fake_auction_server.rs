@@ -3,7 +3,7 @@ use crate::xmpp::{Chat, Message};
 use std::sync::mpsc::channel;
 
 pub struct FakeAuctionServer {
-    _item_id: String,
+    item_id: String,
     chat: Chat,
     message_listener: SingleMessageListener<Message>,
 }
@@ -16,8 +16,8 @@ impl FakeAuctionServer {
         let (tx, rx) = channel();
 
         FakeAuctionServer {
-            _item_id: item_id.to_string(),
-            chat: Chat::new(&jid, pass, tx),
+            item_id: item_id.to_string(),
+            chat: Chat::new(&jid, pass, "sniper@localhost", tx),
             message_listener: SingleMessageListener::new(rx),
         }
     }
@@ -32,6 +32,10 @@ impl FakeAuctionServer {
 
     fn item_id_as_login(id: &str) -> String {
         format!("auction-{}@localhost", id)
+    }
+
+    pub fn item_id(&self) -> &str {
+        &self.item_id
     }
 
     /*fn auction_resource() -> &'static str {

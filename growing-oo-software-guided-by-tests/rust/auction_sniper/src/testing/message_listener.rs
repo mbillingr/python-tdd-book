@@ -11,6 +11,6 @@ impl<T> SingleMessageListener<T> {
     }
 
     pub fn receives_a_message(&self) {
-        assert!(self.rx.recv_timeout(Duration::from_secs(5)).is_ok())
+        assert!(self.rx.recv_timeout(Duration::from_secs(50)).is_ok())
     }
 }

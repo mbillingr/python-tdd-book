@@ -1,4 +1,4 @@
-use super::Message;
+use crate::xmpp::{Message, MessageListener};
 use libstrophe::{Connection, Stanza};
 use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::thread;
@@ -6,13 +6,13 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 pub struct Chat {
-    jid: String,
+    other_jid: String,
     output_channel: Sender<Message>,
     thread: JoinHandle<()>,
 }
 
 impl Chat {
-    pub fn new(jid: &str, pass: &str, listener: Sender<Message>) -> Self {
+    pub fn new(jid: &str, pass: &str, other_jid: &str, listener: impl MessageListener) -> Self {
         let (otx, orx) = channel::<Message>();
 
         let message_handler = move |_ctx: &libstrophe::Context,
@@ -38,7 +38,7 @@ impl Chat {
                 text: intext,
                 who: stanza.from().expect("Cannot get from").to_string(),
             };
-            listener.send(msg).unwrap();
+            listener.process_message(msg);
 
             true
         };
@@ -96,7 +96,7 @@ impl Chat {
             .unwrap();
 
         Chat {
-            jid: jid.to_string(),
+            other_jid: other_jid.to_string(),
             output_channel: otx,
             thread,
         }
@@ -106,11 +106,11 @@ impl Chat {
         self.output_channel.send(msg).unwrap()
     }
 
-    pub fn send(&self, text: String) {
+    pub fn send(&self, text: impl ToString) {
         self.output_channel
             .send(Message {
-                text,
-                who: self.jid.clone(),
+                text: text.to_string(),
+                who: self.other_jid.clone(),
             })
             .unwrap()
     }

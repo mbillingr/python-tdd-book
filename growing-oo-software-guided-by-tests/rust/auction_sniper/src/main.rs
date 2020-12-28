@@ -1,3 +1,4 @@
+use crate::xmpp::Chat;
 use std::collections::HashMap;
 
 pub mod testing;
@@ -10,12 +11,31 @@ fn main() {
 struct Main;
 
 impl Main {
-    pub fn main(_xmpp_hostname: &str, _sniper_id: &str, _sniper_password: &str, io: impl SniperIO) {
+    pub fn main(
+        xmpp_hostname: &str,
+        sniper_id: &str,
+        sniper_password: &str,
+        item_id: &str,
+        io: impl SniperIO,
+    ) {
+        let jid = &format!("{}@{}", sniper_id, xmpp_hostname);
+        let chat = Chat::new(
+            jid,
+            sniper_password,
+            &Self::auction_id(item_id, xmpp_hostname),
+            (),
+        );
+        chat.send("hi");
         Main::start_user_interface(io);
+        chat.stop()
     }
 
     pub fn start_user_interface(io: impl SniperIO) {
         MainWindow::new(io).run_event_loop()
+    }
+
+    fn auction_id(item_id: &str, xmpp_hostname: &str) -> String {
+        format!("auction-{}@{}", item_id, xmpp_hostname)
     }
 }
 
@@ -68,6 +88,8 @@ mod auction_sniper_end_to_end_tests {
 
     #[test]
     fn sniper_joins_auction_until_auction_closes() {
+        //SimpleLogger::new().init().unwrap();
+
         let auction = FakeAuctionServer::start_selling_item("item-54321");
 
         let application = ApplicationRunner::start_bidding_in(&auction);

@@ -20,18 +20,21 @@ impl ApplicationRunner {
         "sniper"
     }
 
-    pub fn start_bidding_in(_auction: &FakeAuctionServer) -> Self {
+    pub fn start_bidding_in(auction: &FakeAuctionServer) -> Self {
         let driver = Arc::new(AuctionSniperDriver::new());
 
         let thread_driver = driver.clone();
 
+        let item_id = auction.item_id().to_string();
+
         let thread = thread::Builder::new()
             .name("Test Application".to_string())
-            .spawn(|| {
+            .spawn(move || {
                 crate::Main::main(
                     XMPP_HOSTNAME,
                     Self::sniper_id(),
                     Self::sniper_password(),
+                    &item_id,
                     thread_driver,
                 );
             })
