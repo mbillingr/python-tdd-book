@@ -1,14 +1,12 @@
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
-pub type Message = String;
-
-pub struct SingleMessageListener {
-    rx: Receiver<Message>,
+pub struct SingleMessageListener<T> {
+    rx: Receiver<T>,
 }
 
-impl SingleMessageListener {
-    pub fn new(rx: Receiver<Message>) -> Self {
+impl<T> SingleMessageListener<T> {
+    pub fn new(rx: Receiver<T>) -> Self {
         SingleMessageListener { rx }
     }
 

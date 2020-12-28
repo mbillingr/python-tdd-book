@@ -1,18 +1,52 @@
+use std::collections::HashMap;
+
 pub mod testing;
+pub mod xmpp;
 
 fn main() {
     println!("Hello, world!");
 }
 
-pub fn sniper_main(
-    _xmpp_hostname: &str,
-    _sniper_id: &str,
-    _sniper_password: &str,
-    mut io: impl SniperIO,
-) -> Result<(), ()> {
-    loop {
-        let _ = io.get_command();
-        io.update("STATUS: joining");
+struct Main;
+
+impl Main {
+    pub fn main(_xmpp_hostname: &str, _sniper_id: &str, _sniper_password: &str, io: impl SniperIO) {
+        Main::start_user_interface(io);
+    }
+
+    pub fn start_user_interface(io: impl SniperIO) {
+        MainWindow::new(io).run_event_loop()
+    }
+}
+
+struct MainWindow<T: SniperIO> {
+    labels: HashMap<&'static str, &'static str>,
+    io: T,
+}
+
+impl<T: SniperIO> MainWindow<T> {
+    fn new(io: T) -> Self {
+        let mut labels = HashMap::new();
+        labels.insert("STATUS", STATUS_JOINING);
+        MainWindow { labels, io }
+    }
+
+    fn run_event_loop(&mut self) {
+        loop {
+            let _ = self.io.get_command();
+            let output = self.create_output();
+            self.io.update(&output);
+        }
+    }
+
+    fn create_output(&self) -> String {
+        let mut output = String::new();
+
+        for (label, value) in &self.labels {
+            output += &format!("{}: {}", label, value);
+        }
+
+        output
     }
 }
 
