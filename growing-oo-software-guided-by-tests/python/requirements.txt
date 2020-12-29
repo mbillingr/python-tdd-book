@@ -1,3 +1,4 @@
 nbxmpp
+xmpppy
 pytest-qt
 pyhamcrest
