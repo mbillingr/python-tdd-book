@@ -25,7 +25,7 @@ SECRET_KEY = 'naiy-kc$873+dd*=8a%q)0ft=aohmb0i7ddpf@6#!ku*%@fbpn'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
