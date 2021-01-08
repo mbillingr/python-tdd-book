@@ -1,10 +1,16 @@
 import os
 import time
 
+from django.conf import settings
+from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.keys import Keys
+
+User = get_user_model()
 
 MAX_WAIT = 10
 
@@ -19,6 +25,7 @@ def wait(fn):
                 if time.time() - start_time > MAX_WAIT:
                     raise e
                 time.sleep(0.1)
+
     return modified_fn
 
 
@@ -33,7 +40,8 @@ class FunctionalTest(StaticLiveServerTestCase):
         self.browser.quit()
 
     def add_list_item(self, item_text):
-        num_rows = len(self.browser.find_elements_by_css_selector('#id_list_table tr'))
+        num_rows = len(
+            self.browser.find_elements_by_css_selector('#id_list_table tr'))
         self.get_item_input_box().send_keys(item_text)
         self.get_item_input_box().send_keys(Keys.ENTER)
         item_number = num_rows + 1
@@ -63,3 +71,16 @@ class FunctionalTest(StaticLiveServerTestCase):
     @wait
     def wait_for(self, fn):
         return fn()
+
+    def create_pre_authenticated_session(self, email):
+        user = User.objects.create(email=email)
+        session = SessionStore()
+        session[SESSION_KEY] = user.pk
+        session[BACKEND_SESSION_KEY] = settings.AUTHENTICATION_BACKENDS[0]
+        session.save()
+        ## to set a cookie we need to first visit the domain.
+        ## 404 pages load the quickest!
+        self.browser.get(self.live_server_url + "/404_no_such_url/")
+        self.browser.add_cookie(dict(name=settings.SESSION_COOKIE_NAME,
+                                     value=session.session_key,
+                                     path='/'))
